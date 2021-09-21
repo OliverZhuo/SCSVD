@@ -66,38 +66,46 @@ class SCMF(object):
             if (step + 1) % 10 == 0:
                 self.learnrate *= 0.8
             # print(step+1, self.learnrate)
+            
             CCT = C @ C.transpose()
             CHT = C @ H.transpose()
             objective = 0
-            objective += (self.gamma / 2) * (
-                    np.linalg.norm(U, 'fro') ** 2 + np.linalg.norm(V, 'fro') ** 2 + np.linalg.norm(Imp,
-                                                                                                   'fro') ** 2 + np.linalg.norm(
-                user_b, 2) ** 2 + np.linalg.norm(item_b, 2) ** 2)
+
+            objective += (self.gamma / 2) * (np.linalg.norm(U, 'fro') ** 2 + np.linalg.norm(V, 'fro') ** 2 + np.linalg.norm(Imp,
+                    'fro') ** 2 + np.linalg.norm(user_b, 2) ** 2 + np.linalg.norm(item_b, 2) ** 2)
+
             objective += (self.alpha / 2) * ((np.linalg.norm((H - U.transpose() @ C), 'fro')) ** 2) - (
-                    self.beta / 2) * (
-                             np.trace(H.transpose() @ B @ F)) + (self.eta / 2) * (np.linalg.norm(F - H, 'fro') ** 2)
+                    self.beta / 2) * (np.trace(H.transpose() @ B @ F)) + (self.eta / 2) * (np.linalg.norm(F - H, 'fro') ** 2)
+
             for user in self.trainset.all_users():
                 items = [j for j, _ in self.trainset.ur[user]]
                 for item, rating in self.trainset.ur[user]:
                     userImp = np.zeros(self.numFactors)
                     for tempitem in items:
                         userImp += Imp[:, tempitem]
+
                     userImp *= (1.0 / sqrt(len(items)))
                     predicted = self.trainset.global_mean + user_b[user] + item_b[item] + (userImp + U[:, user]).dot(
                         V[:, item])
                     error = predicted - rating
                     objective += error ** 2
+
                     dJbu = error + self.gamma * user_b[user]
                     user_b[user] -= self.learnrate * dJbu
+
                     dJbi = error + self.gamma * item_b[item]
                     item_b[item] -= self.learnrate * dJbi
+
                     dJu = error * V[:, item] + self.gamma * U[:, user]
                     U[:, user] -= self.learnrate * dJu
+
                     dJv = error * (U[:, user] + userImp) + self.gamma * V[:, item]
                     V[:, item] -= self.learnrate * dJv
+
                     for tempitem in items:
                         dJy = error * (1.0 / sqrt(len(items))) * V[:, item] + self.impitem * Imp[:, tempitem]
                         Imp[:, tempitem] -= self.learnrate * dJy
+
                 U[:, user] -= self.learnrate * self.alpha * (CCT @ U[:, user] - CHT[:, user])
             # dJC = -self.alpha * U @ H + self.alpha * U @ U.transpose() @ C
             # C -= self.learnrate * dJC
@@ -165,6 +173,7 @@ if __name__ == '__main__':
     datname = input('please enter dataset name(one of filmtrust, ciao, epinions2 and flixster): ')
     rmin = input('please enter the lower bound of rating scale: ')
     rmax = input('please enter the upper bound of rating scale: ')
+
     if input('Do you want to change parameters? ') == 'yes':
         numFactors = int(input("please enter the number of factors "))
         numCommunities = int(input('please enter the number of communities '))
@@ -178,9 +187,11 @@ if __name__ == '__main__':
         thre = float(input('please enter the threshold for positive '))
         for i in range(5):
             print("Current fold is " + str(i + 1))
+
             rpath = "./Datasets/" + datname + "/cvtrain" + str(i + 1) + ".txt"
             vpath = "./Datasets/" + datname + "/cvtest" + str(i + 1) + ".txt"
             tpath = "./Datasets/" + datname + "/trust.txt"
+
             obj = SCMF(rpath, vpath, tpath, rmin, rmax)
             obj.numFactors = numFactors
             obj.numCommunities = numCommunities
@@ -192,6 +203,7 @@ if __name__ == '__main__':
             obj.learnrate = learnrate
             obj.maxiteration = maxiteration
             obj.threshold = thre
+
             U, V, user_b, item_b, Imp, H = obj.train()
             MAE, RMSE, cMAE, cRMSE, p, r, f, fpr, tpr, myauc, ndcg, mypreds = obj.test(U, V, user_b, item_b, Imp)
             tMAE += MAE
@@ -205,14 +217,17 @@ if __name__ == '__main__':
             tprList.append(tpr)
             tAUC += myauc
             tNDCG += ndcg
+
             np.save('./SCSVD_' + datname + '_' + str(numFactors) + '_' + str(i + 1) + '.npy', mypreds)
             np.save('./U_' + datname + str(i + 1) + '_' + str(numFactors) + '.npy', U)
             np.save('./H_' + datname + str(i + 1) + '_' + str(numFactors) + '.npy', H)
             obj.print_parameters()
+
         print("Fianlly, MAE = " + str(tMAE / 5) + ", RMSE = " + str(tRMSE / 5))
         print("cMAE = " + str(tcMAE / 5) + ", cRMSE = " + str(tcRMSE / 5))
         print("pre = " + str(tPre / 5) + ", rec = " + str(tRec / 5) + ", f1 = " + str(tF1 / 5))
         print("AUC = " + str(tAUC / 5) + ", NDCG = " + str(tNDCG / 5))
+
         np.save('./SCSVD_tpr_' + datname + '_ave_' + str(numFactors) + '.npy', tprList)
         np.save('./SCSVD_fpr_' + datname + '_ave_' + str(numFactors) + '.npy', fprList)
         print(datname)
