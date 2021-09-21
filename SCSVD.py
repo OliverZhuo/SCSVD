@@ -220,6 +220,7 @@ if __name__ == '__main__':
         for i in range(5):
             print("Current fold is " + str(i + 1))
             ''' 注释 '''
+            ''' 注释 '''
             rpath = "./Datasets/" + datname + "/cvtrain" + str(i + 1) + ".txt"
             vpath = "./Datasets/" + datname + "/cvtest" + str(i + 1) + ".txt"
             tpath = "./Datasets/" + datname + "/trust.txt"
