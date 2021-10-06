@@ -9,6 +9,7 @@ from eval_utils import *
 
 
 class SCMF(object):
+    # 参数初始化
     def __init__(self, rpath, vpath, tpath, rmin, rmax):
         self.tpath = tpath
         self.rating_scale = (float(rmin), float(rmax))
@@ -28,6 +29,7 @@ class SCMF(object):
         self.testset = create_testings(vpath, self.rating_scale)
         self.writefile = False  # write txt or not
 
+    # 输出参数
     def print_parameters(self):
         print('*' * 40)
         print('rating scale is: ' + str(self.rating_scale))
@@ -42,18 +44,26 @@ class SCMF(object):
         print('maximum number of iteration: ' + str(self.maxiteration))
         print('*' * 40)
 
+    # 初始化设置
     def setup(self):
         B, A = create_mMatrix(self.trainset, self.tpath)
+        # B矩阵最终是  B modulartiy乘上邻接矩阵
         B = np.multiply(B, A)
+        # 初始化U V矩阵，矩阵内容为正态分布 均值方差为mean std。矩阵大小为factor * n_users
         U = np.random.normal(self.initMean, self.initStd, (self.numFactors, self.trainset.n_users))
         V = np.random.normal(self.initMean, self.initStd, (self.numFactors, self.trainset.n_items))
+        # 用户和被推荐项目 向量，向量大小为n_users或者n_items 服从正态分布
         user_b = np.random.normal(self.initMean, self.initStd, self.trainset.n_users)
         item_b = np.random.normal(self.initMean, self.initStd, self.trainset.n_items)
+        # imp矩阵大小为 n_factor * n_item
         Imp = np.random.normal(self.initMean, self.initStd, (self.numFactors, self.trainset.n_items))
+        # H F矩阵为 n_users * n_communities
         H = np.random.normal(1 / self.numCommunities, self.initStd, (self.trainset.n_users, self.numCommunities))
+        # C矩阵为n_factors * n_communities
         C = np.random.normal(self.initMean, self.initStd, (self.numFactors, self.numCommunities))
         F = np.random.normal(1 / self.numCommunities, self.initStd, (self.trainset.n_users, self.numCommunities))
-        # F = H
+
+
         Inc = np.eye(self.trainset.n_users, self.numCommunities)
         return B, A, U, V, user_b, item_b, Imp, H, C, F, Inc
 
@@ -79,18 +89,28 @@ class SCMF(object):
 
             for user in self.trainset.all_users():
                 items = [j for j, _ in self.trainset.ur[user]]
+
                 for item, rating in self.trainset.ur[user]:
                     userImp = np.zeros(self.numFactors)
+
                     for tempitem in items:
                         userImp += Imp[:, tempitem]
 
                     userImp *= (1.0 / sqrt(len(items)))
+
                     predicted = self.trainset.global_mean + user_b[user] + item_b[item] + (userImp + U[:, user]).dot(
                         V[:, item])
+                    ''' predicted就是rij估计 '''
+                    ''' error 就是 rij估计 - rij  '''
+                    ''' gamma就是第三个希腊字母 r '''
+                    ''' user_b[user] pi(user ui 的偏差) '''
+                    ''' item_b[item] qj(item qj 的偏差) '''
                     error = predicted - rating
+
                     objective += error ** 2
 
                     dJbu = error + self.gamma * user_b[user]
+                    
                     user_b[user] -= self.learnrate * dJbu
 
                     dJbi = error + self.gamma * item_b[item]
