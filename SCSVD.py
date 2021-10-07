@@ -46,9 +46,12 @@ class SCMF(object):
 
     # 初始化设置
     def setup(self):
+        # 除了B矩阵以外，其他矩阵全部都是随机正态分布初始化
         B, A = create_mMatrix(self.trainset, self.tpath)
         # B矩阵最终是  B modulartiy乘上邻接矩阵
         B = np.multiply(B, A)
+
+
         # 初始化U V矩阵，矩阵内容为正态分布 均值方差为mean std。矩阵大小为factor * n_users
         U = np.random.normal(self.initMean, self.initStd, (self.numFactors, self.trainset.n_users))
         V = np.random.normal(self.initMean, self.initStd, (self.numFactors, self.trainset.n_items))
@@ -79,13 +82,17 @@ class SCMF(object):
             
             CCT = C @ C.transpose()
             CHT = C @ H.transpose()
+
             objective = 0
 
-            objective += (self.gamma / 2) * (np.linalg.norm(U, 'fro') ** 2 + np.linalg.norm(V, 'fro') ** 2 + np.linalg.norm(Imp,
-                    'fro') ** 2 + np.linalg.norm(user_b, 2) ** 2 + np.linalg.norm(item_b, 2) ** 2)
+            objective += (self.gamma / 2) * (         np.linalg.norm(U, 'fro') ** 2
+             + np.linalg.norm(V, 'fro') ** 2    +     np.linalg.norm(Imp,'fro') ** 2
+             + np.linalg.norm(user_b, 2) ** 2   +     np.linalg.norm(item_b, 2) ** 2       )
 
-            objective += (self.alpha / 2) * ((np.linalg.norm((H - U.transpose() @ C), 'fro')) ** 2) - (
-                    self.beta / 2) * (np.trace(H.transpose() @ B @ F)) + (self.eta / 2) * (np.linalg.norm(F - H, 'fro') ** 2)
+            objective += (self.alpha / 2) * 
+            ((np.linalg.norm((H - U.transpose() @ C), 'fro')) ** 2)
+
+             - (self.beta / 2) * (np.trace(H.transpose() @ B @ F)) + (self.eta / 2) * (np.linalg.norm(F - H, 'fro') ** 2)
 
             for user in self.trainset.all_users():
                 items = [j for j, _ in self.trainset.ur[user]]
@@ -109,34 +116,41 @@ class SCMF(object):
 
                     objective += error ** 2
 
+                    # p  -> u_bias  seita就是learn rate
                     dJbu = error + self.gamma * user_b[user]
-                    
                     user_b[user] -= self.learnrate * dJbu
-
+                    # b  -> item_bias
                     dJbi = error + self.gamma * item_b[item]
                     item_b[item] -= self.learnrate * dJbi
-
+                    # user embedding
                     dJu = error * V[:, item] + self.gamma * U[:, user]
                     U[:, user] -= self.learnrate * dJu
-
+                    # item embedding
                     dJv = error * (U[:, user] + userImp) + self.gamma * V[:, item]
                     V[:, item] -= self.learnrate * dJv
-
+                    # implicit feedback
                     for tempitem in items:
                         dJy = error * (1.0 / sqrt(len(items))) * V[:, item] + self.impitem * Imp[:, tempitem]
                         Imp[:, tempitem] -= self.learnrate * dJy
 
                 U[:, user] -= self.learnrate * self.alpha * (CCT @ U[:, user] - CHT[:, user])
+
             # dJC = -self.alpha * U @ H + self.alpha * U @ U.transpose() @ C
             # C -= self.learnrate * dJC
             C = np.linalg.inv(U @ U.transpose()) @ U @ H
+
             Q = (self.alpha / (self.eta + self.alpha)) * C.transpose() @ U + (
                     self.beta / (2 * (self.eta + self.alpha))) * F.transpose() @ B.transpose() + (
                         self.eta / (self.eta + self.alpha)) * F.transpose()
+
             UH, DH, VHT = np.linalg.svd(Q, full_matrices=True)
+
             H = VHT.transpose() @ Inc @ UH.transpose()
+
             F = np.maximum(H + (self.beta / (2 * self.eta)) * B.transpose() @ H, 0)
+            
             objective /= 2
+
             print("This is " + str(step + 1) + "th iteration, loss = " + str(objective) + ", delta loss = " + str(
                 last_loss - objective))
             if fabs(last_loss - objective) <= 0.000001:
